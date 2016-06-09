@@ -18,10 +18,12 @@ class GBMDRM(object):
             
         
         
-        rspFile = fits.open(rspFileName)
-        self.smeared = False
+
+        rspFile = fits.open(drmfile)
+
+        
  
-        self.fileName = rspFileName.split('/')[-1]
+        self.fileName = drmfile.split('/')[-1]
         
 
         self.chanData = rspFile['EBOUNDS'].data
@@ -67,6 +69,54 @@ class GBMDRM(object):
         
         rspFile.close()
 
+
+    def _ConstructDRM(self,fitFile):
+        '''
+        Construct the drm from the fits file
+        '''
+    
+    
+        mData = fitFile[self.rspNum].data
+        self.phtBins = array(zip(mData['ENERG_LO'],mData['ENERG_HI']))
+       
+        tmp1 = mData["F_CHAN"]
+        tmp2 = mData["N_CHAN"]
+
+        for fcs,ncs,i in zip( tmp1 , tmp2  ,range(self.numEnergyBins)):
+            colIndx = 0
+            
+            try:
+                for fc,nc in zip(fcs,ncs):
+
+                    self.drm[i,fc-1:fc+nc]=mData["MATRIX"][i][colIndx:colIndx+nc]
+                    colIndx+=nc
+            except TypeError: #Prolly not formatted correctly
+                self.drm[i,fcs-1:fcs-1+ncs]=mData["MATRIX"][i][colIndx:colIndx+ncs]
+                colIndx+=ncs
+
+        self.drm=self.drm
+        self.drmTranspose = self.drm.T
+        del mData
+
+
+    def GetDRM(self):
+        """
+        Return The DRM
+        """
+        return self.drm
+
+    def GetPhotonEdges(self):
+        """
+        Return photon edges
+        """
+        return np.array(map(np.mean,self.photonE))
+
+    def GetMCEdges(self):
+        """
+        Return photon edges
+        """
+        return np.array(map(np.mean,self.channelE))[self._energySelection]
+    
 
     def _CreatePhotonEvalEnergies(self):
         
@@ -277,7 +327,7 @@ class GBMDRM(object):
     def SimSpectrum(self, *params):
         
         
-        self.SetParams(params)
+        self.SetParams(*params)
         meanCnts = self.GetModelCnts(ignore=True)
         
         
